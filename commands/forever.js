@@ -6,7 +6,7 @@ var builder = require('../lib/builder');
 var sources = require('../lib/sources');
 var outputs = require('../lib/outputs');
 
-function sidecarLoop (input, output) {
+function sidecarLoop (driver, input, output) {
   
   // everything known for output
   // output must be passed into builder, before generate_driver is
@@ -15,9 +15,6 @@ function sidecarLoop (input, output) {
   var make = builder({ output: endpoint });
   // var make = builder({ output });
 
-  // select an available input source implementation based on env
-  // variables/config
-  var driver = sources(input);
   console.log("INPUT PARAMS", input);
   var impl = driver(input, axios);
   // var impl = testImpl.fakeFrame({ }, axios);
@@ -39,10 +36,23 @@ function main (argv) {
   // 
   var output = { name: 'nightscout', url: argv.nightscoutEndpoint, apiSecret: argv.apiSecret };
   console.log("CONFIGURED OUTPUT", output);
-  var input = { kind: argv.source, url: argv.sourceEndpoint, apiSecret: argv.sourceApiSecret };
-  console.log("CONFIGURED INPUT", input);
+  var spec = { kind: argv.source };
+  var driver = sources(spec);
+  var validated = driver.validate(argv);
+  if (validated.errors) {
+    validated.errors.forEach((item) => {
+      console.log(item);
+    });
+  }
 
-  var things = sidecarLoop(input, output);
+  if (!validated.ok) {
+    console.log("Invalid, disabling nightscout-connect", validated);
+    process.exit(1);
+    return;
+  }
+
+  console.log("CONFIGURED INPUT", validated.config);
+  var things = sidecarLoop(driver, validated.config, output);
   console.log(things);
   var actor = interpret(things);
   actor.start( );
