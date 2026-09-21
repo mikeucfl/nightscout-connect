@@ -182,6 +182,7 @@ To synchronize from Glooko use the following variables.
 * `CONNECT_SOURCE=glooko`
 * `CONNECT_GLOOKO_EMAIL=`
 * `CONNECT_GLOOKO_PASSWORD=`
+* `CONNECT_GLOOKO_TIMEZONE=` optional IANA timezone, for example `Europe/Prague`
 * `CONNECT_GLOOKO_TIMEZONE_OFFSET=0`
 * `CONNECT_GLOOKO_DEVICE_ID=` optional stable device identity
 * `CONNECT_GLOOKO_SERIAL_NUMBER=` optional stable serial number
@@ -195,7 +196,8 @@ default value for `CONNECT_GLOOKO_ENV` is `default`.
   `eu`, `development`, `production`, for `api.glooko.work`, and
   `externalapi.glooko.com`, respectively.
 * `CONNECT_GLOOKO_SERVER` the hostname server to use - `api.glooko.com` by `default`, `eu.api.glooko.com` for EU users, or a more specific regional host such as `de-fr.api.glooko.com`.
-* `CONNECT_GLOOKO_TIMEZONE_OFFSET` defines the time zone offset you are at from the UTC time zone, in hours
+* `CONNECT_GLOOKO_TIMEZONE` defines the IANA timezone used to convert Glooko local wall-clock timestamps, for example `Europe/Prague`. This handles daylight saving time based on each timestamp.
+* `CONNECT_GLOOKO_TIMEZONE_OFFSET` defines a fixed offset from UTC in hours and is retained for backward compatibility. `CONNECT_GLOOKO_TIMEZONE` takes precedence when both are configured.
 
 If both, `CONNECT_GLOOKO_SERVER` and `CONNECT_GLOOKO_ENV` are set, only
 `CONNECT_GLOOKO_SERVER` will be used.
@@ -205,8 +207,14 @@ readings, CGM entries. Some EU accounts may require newer web-login or v3 graph
 flows. `CONNECT_GLOOKO_AUTH_MODE=web` uses Glooko's web sign-in form with CSRF
 token handling; `auto` tries API login first and falls back to web login on a
 422 response. The optional v3 graph fallback fetches `cgmHigh`, `cgmNormal`,
-and `cgmLow` series when v2 CGM readings are empty, using the same
-authenticated session cookie.
+and `cgmLow` series when v2 CGM readings are empty or rejected with HTTP 422,
+using the same authenticated session cookie. A rejected v3 fallback is surfaced
+as an error when v2 CGM has also failed, rather than reported as an empty batch.
+
+For a read-only check against a real account, see the
+[Glooko integration test plan](docs/glooko-live-test-plan.md). The probe fetches
+and transforms one frame in memory without writing to Nightscout; use an
+ignored `.env.local` file for credentials and never commit it.
 
 ### Libre Link Up
 To synchronize from Libre Link Up use the following variables.

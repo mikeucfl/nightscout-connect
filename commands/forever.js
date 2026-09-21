@@ -6,7 +6,7 @@ var builder = require('../lib/builder');
 var sources = require('../lib/sources');
 var outputs = require('../lib/outputs');
 
-function sidecarLoop (driver, input, output) {
+function sidecarLoop (input, output) {
   
   // everything known for output
   // output must be passed into builder, before generate_driver is
@@ -15,51 +15,44 @@ function sidecarLoop (driver, input, output) {
   var make = builder({ output: endpoint });
   // var make = builder({ output });
 
-  console.log("INPUT PARAMS", input);
-  var impl = driver(input, axios);
+  // select an available input source implementation based on env
+  // variables/config
+  var driver = sources(input);
+  var _v = driver.validate ? driver.validate(input) : null;
+  if (_v && !_v.ok) console.log("VALIDATION ERRORS", _v.errors.map(function(e){return e.desc;}));
+  var _opts = (_v && _v.ok) ? _v.config : input;
+  console.log("DRIVER CONFIGURED", { kind: input.kind });
+  var impl = driver(_opts, axios);
   // var impl = testImpl.fakeFrame({ }, axios);
 
   impl.generate_driver(make);
 
   var built = make( );
   // console.log("BUILDER OUTPUT", built);
-  console.log("BUILDER OUTPUT", JSON.stringify(built, null, 2));
   return built;
 
 }
 
 function main (argv) {
-  console.log("STARTING", argv);
+  console.log("STARTING", { source: argv.source });
   // selected output
   // argv.nightscoutEndpoint;
   // argv.apiSecret;
   // 
   var output = { name: 'nightscout', url: argv.nightscoutEndpoint, apiSecret: argv.apiSecret };
-  console.log("CONFIGURED OUTPUT", output);
-  var spec = { kind: argv.source };
-  var driver = sources(spec);
-  var validated = driver.validate(argv);
-  if (validated.errors) {
-    validated.errors.forEach((item) => {
-      console.log(item);
-    });
-  }
+  console.log("CONFIGURED OUTPUT", { name: output.name });
+  var input = Object.assign({}, argv, { kind: argv.source, url: argv.sourceEndpoint, apiSecret: argv.sourceApiSecret });
+  // argv now carries every CONNECT_* env var, credentials included, so log the
+  // shape rather than the values.
+  console.log("CONFIGURED INPUT", { kind: input.kind });
 
-  if (!validated.ok) {
-    console.log("Invalid, disabling nightscout-connect", validated);
-    process.exit(1);
-    return;
-  }
-
-  console.log("CONFIGURED INPUT", validated.config);
-  var things = sidecarLoop(driver, validated.config, output);
-  console.log(things);
+  var things = sidecarLoop(input, output);
   var actor = interpret(things);
   actor.start( );
   actor.send({type: 'START'});
   setTimeout(( ) => {
   actor.send({type: 'STOP'});
-  }, 60000 * 5);
+  }, 60000 * 60 * 24);
 
 }
 
